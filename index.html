@@ -26,6 +26,32 @@
     .cell.user{color:rgba(120,210,255,.95);font-weight:700}
     .cell.error{background:rgba(255,70,70,.18)}
     .msg{min-height:22px;opacity:.9}
+    .num-pad{
+  width:min(520px,92vw);
+  display:grid;
+  grid-template-columns:repeat(5,1fr);
+  gap:10px;
+  margin-top:10px;
+}
+
+.num-pad button{
+  padding:14px 0;
+  font-size:20px;
+  border-radius:14px;
+  border:1px solid rgba(255,255,255,0.18);
+  background:rgba(255,255,255,0.08);
+  color:#eef2ff;
+}
+
+.num-pad button:active{
+  background:rgba(120,210,255,0.25);
+}
+
+.num-pad .clear{
+  grid-column: span 5;
+  background:rgba(255,70,70,0.25);
+}
+
   </style>
 </head>
 <body>
@@ -44,12 +70,25 @@
   <main>
     <div id="grid" class="grid" aria-label="Sudoku grid"></div>
     <div id="msg" class="msg"></div>
+    <div id="numPad" class="num-pad">
+        <button data-n="1">1</button>
+        <button data-n="2">2</button>
+        <button data-n="3">3</button>
+        <button data-n="4">4</button>
+        <button data-n="5">5</button>
+        <button data-n="6">6</button>
+        <button data-n="7">7</button>
+        <button data-n="8">8</button>
+        <button data-n="9">9</button>
+        <button data-n="0" class="clear">Sil</button>
+      </div>
+      
   </main>
 
   <script>
     const gridEl = document.getElementById("grid");
     const msgEl = document.getElementById("msg");
-
+    const numPad = document.getElementById("numPad");
     const btnEasy = document.getElementById("newEasy");
     const btnMed  = document.getElementById("newMed");
     const btnCheck= document.getElementById("check");
@@ -240,6 +279,22 @@
     });
 
     loadNew("easy");
+    numPad.addEventListener("click", (e) => {
+  const btn = e.target;
+  if (!btn.dataset.n) return;
+  if (given[selectedIdx]) return;
+
+  const n = Number(btn.dataset.n);
+  board[selectedIdx] = n === 0 ? 0 : n;
+
+  render();
+  markErrors();
+
+  if (checkWin()) {
+    setMsg("🎉 Tebrikler! Sudoku çözüldü.");
+  }
+});
+
   </script>
 </body>
 </html>
