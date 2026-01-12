@@ -1,0 +1,245 @@
+<!doctype html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Sudoku (Tek Dosya)</title>
+  <style>
+    *{box-sizing:border-box}
+    body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial;background:#0b1020;color:#eef2ff;
+      display:flex;flex-direction:column;align-items:center;gap:14px;padding:22px}
+    header{width:min(560px,92vw)}
+    h1{margin:0 0 8px;font-size:28px}
+    .controls{display:flex;flex-wrap:wrap;gap:10px;margin:10px 0}
+    button{border:1px solid rgba(255,255,255,.18);background:rgba(255,255,255,.08);color:#eef2ff;
+      padding:10px 12px;border-radius:12px;cursor:pointer}
+    button:hover{background:rgba(255,255,255,.14)}
+    .hint{margin:8px 0 0;opacity:.75;font-size:13px}
+    main{width:min(560px,92vw);display:grid;gap:12px}
+    .grid{width:min(520px,92vw);aspect-ratio:1/1;display:grid;grid-template-columns:repeat(9,1fr);
+      border:2px solid rgba(255,255,255,.25);border-radius:18px;overflow:hidden;
+      background:radial-gradient(circle at 50% 30%,#16204a 0%,#070a14 60%,#05060c 100%);
+      box-shadow:0 18px 45px rgba(0,0,0,.45)}
+    .cell{border:1px solid rgba(255,255,255,.08);display:grid;place-items:center;font-size:20px;outline:none;user-select:none}
+    .cell.selected{background:rgba(120,210,255,.18)}
+    .cell.given{color:rgba(255,255,255,.92);font-weight:700}
+    .cell.user{color:rgba(120,210,255,.95);font-weight:700}
+    .cell.error{background:rgba(255,70,70,.18)}
+    .msg{min-height:22px;opacity:.9}
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Sudoku</h1>
+    <div class="controls">
+      <button id="newEasy">Yeni (Kolay)</button>
+      <button id="newMed">Yeni (Orta)</button>
+      <button id="check">Kontrol Et</button>
+      <button id="solve">Çöz</button>
+      <button id="clear">Temizle</button>
+    </div>
+    <p class="hint">Klavye: 1-9 gir, Backspace ile sil. Ok tuşlarıyla gez. (R yok, buton var 😄)</p>
+  </header>
+
+  <main>
+    <div id="grid" class="grid" aria-label="Sudoku grid"></div>
+    <div id="msg" class="msg"></div>
+  </main>
+
+  <script>
+    const gridEl = document.getElementById("grid");
+    const msgEl = document.getElementById("msg");
+
+    const btnEasy = document.getElementById("newEasy");
+    const btnMed  = document.getElementById("newMed");
+    const btnCheck= document.getElementById("check");
+    const btnSolve= document.getElementById("solve");
+    const btnClear= document.getElementById("clear");
+
+    let selectedIdx = 0;
+    let given = Array(81).fill(false);
+    let board = Array(81).fill(0);
+    let solution = Array(81).fill(0);
+
+    function idxToRC(i){ return [Math.floor(i/9), i%9]; }
+    function rcToIdx(r,c){ return r*9+c; }
+    function setMsg(t){ msgEl.textContent = t; }
+
+    function render(){
+      gridEl.innerHTML = "";
+      for(let i=0;i<81;i++){
+        const d = document.createElement("div");
+        d.className = "cell";
+        d.tabIndex = 0;
+
+        if (given[i]) d.classList.add("given");
+        else d.classList.add("user");
+
+        d.textContent = board[i] ? String(board[i]) : "";
+        if (i === selectedIdx) d.classList.add("selected");
+
+        const [r,c] = idxToRC(i);
+        if (c === 2 || c === 5) d.style.borderRight = "2px solid rgba(255,255,255,0.18)";
+        if (r === 2 || r === 5) d.style.borderBottom = "2px solid rgba(255,255,255,0.18)";
+
+        d.addEventListener("click", () => { selectedIdx = i; render(); });
+        gridEl.appendChild(d);
+      }
+    }
+
+    function isValidPlacement(arr, r, c, val){
+      for(let cc=0; cc<9; cc++) if (cc!==c && arr[rcToIdx(r,cc)]===val) return false;
+      for(let rr=0; rr<9; rr++) if (rr!==r && arr[rcToIdx(rr,c)]===val) return false;
+      const br = Math.floor(r/3)*3, bc = Math.floor(c/3)*3;
+      for(let rr=br; rr<br+3; rr++){
+        for(let cc=bc; cc<bc+3; cc++){
+          if ((rr!==r || cc!==c) && arr[rcToIdx(rr,cc)]===val) return false;
+        }
+      }
+      return true;
+    }
+
+    function findEmpty(arr){
+      for(let i=0;i<81;i++) if(arr[i]===0) return i;
+      return -1;
+    }
+
+    function shuffled(nums){
+      const a = nums.slice();
+      for(let i=a.length-1;i>0;i--){
+        const j = Math.floor(Math.random()*(i+1));
+        [a[i],a[j]]=[a[j],a[i]];
+      }
+      return a;
+    }
+
+    function solveSudoku(arr){
+      const pos = findEmpty(arr);
+      if (pos === -1) return true;
+      const [r,c] = idxToRC(pos);
+      for (const v of shuffled([1,2,3,4,5,6,7,8,9])){
+        if (isValidPlacement(arr,r,c,v)){
+          arr[pos]=v;
+          if (solveSudoku(arr)) return true;
+          arr[pos]=0;
+        }
+      }
+      return false;
+    }
+
+    function generateFullSolution(){
+      const arr = Array(81).fill(0);
+      solveSudoku(arr);
+      return arr;
+    }
+
+    function makePuzzleFromSolution(sol, holes){
+      const puzzle = sol.slice();
+      const positions = shuffled([...Array(81).keys()]);
+      let removed = 0;
+
+      for (const p of positions){
+        if (removed >= holes) break;
+        const backup = puzzle[p];
+        puzzle[p] = 0;
+
+        const test = puzzle.slice();
+        if (!solveSudoku(test)){
+          puzzle[p] = backup;
+        } else {
+          removed++;
+        }
+      }
+      return puzzle;
+    }
+
+    function loadNew(level){
+      const holes = (level === "easy") ? 38 : 48;
+      solution = generateFullSolution();
+      const puzzle = makePuzzleFromSolution(solution, holes);
+      board = puzzle.slice();
+      given = puzzle.map(v => v !== 0);
+      selectedIdx = 0;
+      setMsg(level === "easy" ? "Kolay Sudoku hazır." : "Orta Sudoku hazır.");
+      render();
+      clearErrors();
+    }
+
+    function clearErrors(){
+      [...gridEl.children].forEach(el => el.classList.remove("error"));
+    }
+
+    function markErrors(){
+      clearErrors();
+      let any = false;
+      for(let i=0;i<81;i++){
+        const v = board[i];
+        if (!v) continue;
+        const [r,c] = idxToRC(i);
+        if (!isValidPlacement(board, r, c, v)){
+          gridEl.children[i].classList.add("error");
+          any = true;
+        }
+      }
+      return any;
+    }
+
+    function checkWin(){
+      for(let i=0;i<81;i++) if (board[i] !== solution[i]) return false;
+      return true;
+    }
+
+    window.addEventListener("keydown", (e) => {
+      const key = e.key;
+
+      if (key === "ArrowLeft")  { selectedIdx = (selectedIdx%9===0) ? selectedIdx : selectedIdx-1; render(); return; }
+      if (key === "ArrowRight") { selectedIdx = (selectedIdx%9===8) ? selectedIdx : selectedIdx+1; render(); return; }
+      if (key === "ArrowUp")    { selectedIdx = (selectedIdx<9) ? selectedIdx : selectedIdx-9; render(); return; }
+      if (key === "ArrowDown")  { selectedIdx = (selectedIdx>=72) ? selectedIdx : selectedIdx+9; render(); return; }
+
+      if (given[selectedIdx]) return;
+
+      if (key >= "1" && key <= "9"){
+        board[selectedIdx] = Number(key);
+        render();
+        const hasErr = markErrors();
+        if (!hasErr && checkWin()) setMsg("🎉 Tebrikler! Sudoku çözüldü.");
+        else setMsg(hasErr ? "Bazı çakışmalar var." : "Devam!");
+        return;
+      }
+
+      if (key === "Backspace" || key === "Delete" || key === "0"){
+        board[selectedIdx] = 0;
+        render();
+        markErrors();
+        setMsg("Silindi.");
+      }
+    });
+
+    btnEasy.addEventListener("click", () => loadNew("easy"));
+    btnMed.addEventListener("click",  () => loadNew("med"));
+
+    btnCheck.addEventListener("click", () => {
+      const hasErr = markErrors();
+      setMsg(hasErr ? "Kırmızı hücrelerde çakışma var." : "Şimdilik hatalı görünmüyor ✅");
+    });
+
+    btnSolve.addEventListener("click", () => {
+      board = solution.slice();
+      given = board.map(_ => true);
+      render();
+      setMsg("Çözüm gösterildi.");
+      clearErrors();
+    });
+
+    btnClear.addEventListener("click", () => {
+      for(let i=0;i<81;i++) if (!given[i]) board[i]=0;
+      render();
+      clearErrors();
+      setMsg("Oyuncu girişleri temizlendi.");
+    });
+
+    loadNew("easy");
+  </script>
+</body>
+</html>
